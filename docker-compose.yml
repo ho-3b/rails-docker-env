@@ -1,0 +1,88 @@
+version: '3'
+services:
+  nginx-proxy:
+    container_name: sample_app_proxy
+    image: nginxproxy/nginx-proxy:1.0.0
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./docker/proxy/certs/:/etc/nginx/certs:ro
+      - proxy:/usr/share/nginx/html
+      - proxy:/etc/nginx/vhost.d
+    restart: always
+    labels:
+      com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy: "true"
+  letsencrypt-nginx:
+    container_name: sample_app_letsencrypt
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    privileged: true
+    environment:
+      - NGINX_PROXY_CONTAINER=nginx-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - proxy:/etc/nginx/vhost.d
+      - proxy:/usr/share/nginx/html
+      - ./docker/proxy/certs:/etc/nginx/certs:rw
+    depends_on:
+      - nginx-proxy
+  db:
+    build: ./docker/db
+    container_name: sample_app_mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: sample_app
+      TZ: 'Asia/Tokyo'
+    command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - db-store:/var/lib/mysql
+      - ./docker/db/conf.d:/etc/mysql/conf.d
+  web:
+    build:
+      context: ./
+      dockerfile: ./docker/web/Dockerfile
+    container_name: sample_app_web
+#    command: bash -c "rm -f tmp/pids/server.pid && rails s -p 3000 -b '0.0.0.0'"
+    volumes:
+      - ./sample-app/:/app/
+      - gem-data:/usr/local/bundle
+    ports:
+      - "3000:3000"
+    environment:
+      VIRTUAL_HOST: local-sample-app.net
+      HTTPS_METHOD: noredirect
+      CERT_NAME: default
+      TZ: Asia/Tokyo
+    stdin_open: true
+    tty: true
+    depends_on:
+      - db
+      - nginx-proxy
+    restart: always
+  adminer:
+    image: adminer:latest
+    container_name: sample_app_adminer
+    environment:
+      VIRTUAL_HOST: adminer.local-sample-app.net
+      HTTPS_METHOD: noredirect
+    ports:
+      - "9000:8080"
+    depends_on:
+      - db
+  smtp:
+    image: schickling/mailcatcher
+    container_name: sample_app_smtp
+    ports:
+      - "1025:1025"
+    environment:
+      VIRTUAL_HOST: mail.local-sample-app.net
+      HTTPS_METHOD: noredirect
+      VIRTUAL_PORT: 1080
+volumes:
+  proxy:
+  gem-data:
+  db-store:
+  redis:
