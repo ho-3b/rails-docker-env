@@ -85,4 +85,3 @@ volumes:
   proxy:
   gem-data:
   db-store:
-  redis:
