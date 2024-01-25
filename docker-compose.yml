@@ -92,7 +92,7 @@ services:
       context: ./
       dockerfile: ./docker/web/Dockerfile
     container_name: sample_app_sidekiq
-    command: bundle exec sidekiq config/sidekiq.yml
+#    command: bundle exec sidekiq config/sidekiq.yml
     volumes:
       - ./sample_app/:/app/
       - gem-data:/usr/local/bundle
